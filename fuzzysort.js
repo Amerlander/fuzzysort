@@ -287,6 +287,7 @@ USAGE:
 
     prepare: function(target) {
       if(!target) return
+      target = target + ''
       return {target:target, _targetLowerCodes:fuzzysort.prepareLowerCodes(target), _nextBeginningIndexes:null, score:null, indexes:null, obj:null} // hidden
     },
     prepareSlow: function(target) {
