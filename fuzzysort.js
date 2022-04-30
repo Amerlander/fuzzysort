@@ -287,6 +287,7 @@ USAGE:
 
     prepare: function(target) {
       if(!target) return
+      target = target + ''
       return {target:target, _targetLowerCodes:fuzzysort.prepareLowerCodes(target), _nextBeginningIndexes:null, score:null, indexes:null, obj:null} // hidden
     },
     prepareSlow: function(target) {
@@ -332,18 +333,85 @@ USAGE:
       var targetI = 0 // where you at
       var typoSimpleI = 0
       var matchesSimpleLen = 0
+      var weightDiacritics = true
+      var diacriticScore = 0
+      //       'aḁăâǎⱥȧạäàáāãåą',
+      //       'b␢β฿𐌁ᛒ',
+      //       'cćĉčċ̄çḉȼƈɕᴄｃ',
+      //       'dďḋḑḍḓḏđ̦ɖɗƌᵭᶁᶑȡᴅｄð',
+      //       'eéèêḙěĕẽḛẻėëēȩęᶒɇȅếềễểḝḗḕȇẹệⱸᴇｅɘǝəɛε',
+      //       'fƒḟ',
+      //       'gɢ₲ǥĝğģɠġ',
+      //       'hĥħḩẖḥḣɦʰƕ',
+      //       'iíìĭîǐïḯĩįīỉȉȋịḭɨ̆ᵻᶖ̇ıɪｉ',
+      //       'jȷĵɉʝɟʲ',
+      //       'kƙꝁḱǩḳḵκϰ₭',
+      //       'lłľļĺḷḹḽḻŀƚⱡɫɬᶅɭȴʟｌ',
+      //       'nńǹňñṅņṇṋṉ̈ɲƞᵰᶇɳȵɴｎŋ',
+      //       'oøöóòôǒőŏȯọɵơỏōõǫȍօ',
+      //       'pṕṗᵽƥᵱ',
+      //       'qꝗʠɋꝙ̃',
+      //       'rŕɍřŗṙȑȓṛɽ',
+      //       'sśṡṣꞩŝšşș̈ß',
+      //       'tťṫţṭʈțṱṯƭ',
+      //       'uŭʉụüúùûǔűưủūũųȕ∪',
+      //       'vṽṿʋꝟⱱ',
+      //       'wẃẁŵẅẇẉ',
+      //       'xẍẋχ',
+      //       'yýỳŷÿỹẏỵɏƴ',
+      //       'zźẑžżẓẕƶ',
+      //       '/\\',
+      //       '….',
+      //       '"\'`»«',
+      //       ',.',
+      //       '&+'
+      const DIACRITICSLowerCode = [
+          [97, 7681, 259, 226, 462, 11365, 551, 7841, 228, 224, 225, 257, 227, 229, 261],
+          [98, 9250, 946, 3647, 55296, 57089, 5842],
+          [99, 263, 265, 269, 267, 772, 231, 7689, 572, 392, 597, 7428, 65347],
+          [100, 271, 7691, 7697, 7693, 7699, 7695, 273, 806, 598, 599, 396, 7533, 7553, 7569, 545, 7429, 65348, 240],
+          [101, 233, 232, 234, 7705, 283, 277, 7869, 7707, 7867, 279, 235, 275, 553, 281, 7570, 583, 517, 7871, 7873, 7877, 7875, 7709, 7703, 7701, 519, 7865, 7879, 11384, 7431, 65349, 600, 477, 601, 603, 949],
+          [102, 402, 7711],
+          [103, 610, 8370, 485, 285, 287, 291, 608, 289],
+          [104, 293, 295, 7721, 7830, 7717, 7715, 614, 688, 405],
+          [105, 237, 236, 301, 238, 464, 239, 7727, 297, 303, 299, 7881, 521, 523, 7883, 7725, 616, 774, 7547, 7574, 775, 305, 618, 65353],
+          [106, 567, 309, 585, 669, 607, 690],
+          [107, 409, 42817, 7729, 489, 7731, 7733, 954, 1008, 8365],
+          [108, 322, 318, 316, 314, 7735, 7737, 7741, 7739, 320, 410, 11361, 619, 620, 7557, 621, 564, 671, 65356],
+          [110, 324, 505, 328, 241, 7749, 326, 7751, 7755, 7753, 776, 626, 414, 7536, 7559, 627, 565, 628, 65358, 331],
+          [111, 248, 246, 243, 242, 244, 466, 337, 335, 559, 7885, 629, 417, 7887, 333, 245, 491, 525, 1413],
+          [112, 7765, 7767, 7549, 421, 7537],
+          [113, 42839, 672, 587, 42841, 771],
+          [114, 341, 589, 345, 343, 7769, 529, 531, 7771, 637],
+          [115, 347, 7777, 7779, 42921, 349, 353, 351, 537, 776, 223],
+          [116, 357, 7787, 355, 7789, 648, 539, 7793, 7791, 429],
+          [117, 365, 649, 7909, 252, 250, 249, 251, 468, 369, 432, 7911, 363, 361, 371, 533, 8746],
+          [118, 7805, 7807, 651, 42847, 11377],
+          [119, 7811, 7809, 373, 7813, 7815, 7817],
+          [120, 7821, 7819, 967],
+          [121, 253, 7923, 375, 255, 7929, 7823, 7925, 591, 436],
+          [122, 378, 7825, 382, 380, 7827, 7829, 438],
+          [47, 92],
+          [8230, 46],
+          [34, 39, 96, 187, 171],
+          [44, 46],
+          [38, 43]
+      ]
 
       // very basic fuzzy match; to remove non-matching targets ASAP!
       // walk through target. find sequential matches.
       // if all chars aren't found then exit
       for(;;) {
-        var isMatch = searchLowerCode === targetLowerCodes[targetI]
-        if(isMatch) {
-          matchesSimple[matchesSimpleLen++] = targetI
-          ++searchI; if(searchI === searchLen) break
-          searchLowerCode = searchLowerCodes[typoSimpleI===0?searchI : (typoSimpleI===searchI?searchI+1 : (typoSimpleI===searchI-1?searchI-1 : searchI))]
+        var isMatch = searchLowerCode === targetLowerCodes[targetI];
+        if (!isMatch) {
+            for (var i = 0; i < DIACRITICSLowerCode.length; i++) {
+                if (DIACRITICSLowerCode[i].includes(searchLowerCode)) {
+                    isMatch = DIACRITICSLowerCode[i].includes(targetLowerCodes[targetI])
+                    if (isMatch && weightDiacritics && searchLowerCode != targetLowerCodes[targetI]) diacriticScore--;
+                    break;
+                }
+            }
         }
-
         ++targetI; if(targetI >= targetLen) { // Failed to find searchI
           // Check for typo or exit
           // we go as far as possible before trying to transpose
@@ -426,6 +494,7 @@ USAGE:
           if(typoStrictI !== 0) score += -20/*typoPenalty*/
         }
         score -= targetLen - searchLen
+        score += (diacriticScore * 10)
         prepared.score = score
         prepared.indexes = new Array(matchesBestLen); for(var i = matchesBestLen - 1; i >= 0; --i) prepared.indexes[i] = matchesBest[i]
 
@@ -598,7 +667,5 @@ return fuzzysortNew()
 // TODO: (performance) layout memory in an optimal way to go fast by avoiding cache misses
 
 // TODO: (performance) preparedCache is a memory leak
-
-// TODO: (like sublime) backslash === forwardslash
 
 // TODO: (performance) i have no idea how well optizmied the allowing typos algorithm is
